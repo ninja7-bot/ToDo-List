@@ -1,21 +1,45 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, getDocs } from "firebase/firestore/lite";
+
+// Firebase config (replace with your own)
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyBZz1eZfi4P5NQlWww9ucZOfph6aFn9tgo",
+  authDomain: "todolist-b8869.firebaseapp.com",
+  projectId: "todolist-b8869",
+  storageBucket: "todolist-b8869.firebasestorage.app",
+  messagingSenderId: "412884284217",
+  appId: "1:412884284217:web:120b59ca908cc29c34eee8",
+  measurementId: "G-WY5M376CG6"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
+  if (req.method === 'GET') {
+    const snapshot = await getDocs(taskCollection);
+    const tasks = snapshot.docs.map(doc => doc.data());
+    return res.status(200).json(tasks);
   }
 
-  const { username, password } = req.body;
+  if (req.method === 'POST') {
+    const newTask = req.body;
+    if (!newTask || !newTask.taskName) {
+      return res.status(400).json({ message: 'Invalid task' });
+    }
 
-  // Simulated login data
-  const storedUsers = [
-    { username: 'admin', password: 'admin123' },
-    { username: 'user1', password: '123456' }
-  ];
-
-  const user = storedUsers.find(u => u.username === username && u.password === password);
-
-  if (user) {
-    res.status(200).json({ success: true, message: 'Login successful' });
-  } else {
-    res.status(401).json({ success: false, message: 'Invalid credentials' });
+    await addDoc(taskCollection, newTask);
+    return res.status(200).json({ message: 'Task added successfully' });
   }
+
+  return res.status(405).json({ message: 'Method Not Allowed' });
 }
