@@ -5,18 +5,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>To-Do List</title>
     <link rel="stylesheet" href="style.css" />
+    <style>
+        .welcome-message {
+            background-color: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            display: none; /* Hidden by default */
+        }
+
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+
+        .task-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .task-controls button {
+            flex: 1;
+            padding: 6px;
+        }
+
+        .todo-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+    </style>
 </head>
 <body>
 <div class="todo-container">
     <h2>To-Do List</h2>
 
+    <div id="welcomeMessage" class="welcome-message">
+        Welcome to your new to-do list! Add your first task to get started.
+    </div>
+
+    <div class="user-info">
+        <div id="userInfo">Loading...</div>
+        <button id="logoutBtn" style="padding: 4px 8px; font-size: 0.8rem;">Logout</button>
+    </div>
+
     <form id="taskForm">
         <input type="text" id="taskName" class="task-input" placeholder="Add a new task" required />
-        <button type="submit">Add Task</button>
+        <div class="task-controls">
+            <button type="submit">Add Task</button>
+            <button type="button" id="clearAllBtn">Clear All</button>
+        </div>
     </form>
 
     <ul class="todo-list" id="taskList">
-        <!-- Tasks will be inserted here -->
+        <li>Loading tasks...</li>
     </ul>
 </div>
 
@@ -24,47 +75,169 @@
     const taskList = document.getElementById('taskList');
     const taskForm = document.getElementById('taskForm');
     const taskNameInput = document.getElementById('taskName');
+    const userInfoElement = document.getElementById('userInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const welcomeMessage = document.getElementById('welcomeMessage');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+
+    // Check if user is logged in
+    function checkAuth() {
+        const username = localStorage.getItem('username');
+        const isNewUser = localStorage.getItem('isNewUser') === 'true';
+
+        if (!username) {
+            window.location.href = 'index.html';
+            return false;
+        }
+
+        userInfoElement.textContent = `Logged in as: ${username}`;
+
+        // Show welcome message for new users
+        if (isNewUser) {
+            welcomeMessage.style.display = 'block';
+            // Clear the new user flag after showing the message
+            localStorage.removeItem('isNewUser');
+        }
+
+        return true;
+    }
 
     async function loadTasks() {
-      try {
-        const res = await fetch('/api/tasks_handler');
-        const tasks = await res.json();
-        taskList.innerHTML = '';
-        tasks.forEach(task => {
-          const li = document.createElement('li');
-          li.textContent = task.taskName;
-          taskList.appendChild(li);
-        });
-      } catch (err) {
-        taskList.innerHTML = '<li>Error loading tasks</li>';
-      }
+        if (!checkAuth()) return;
+
+        try {
+            const res = await fetch('/api/tasks_handler');
+            const tasks = await res.json();
+
+            taskList.innerHTML = '';
+            if (tasks.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'No tasks yet';
+                li.style.fontStyle = 'italic';
+                taskList.appendChild(li);
+                return;
+            }
+
+            tasks.forEach(task => {
+                if (!task.taskName) return; // Skip tasks without names
+
+                const li = document.createElement('li');
+                li.className = 'todo-item';
+
+                const taskText = document.createElement('span');
+                taskText.textContent = task.taskName;
+                if (task.completed) {
+                    taskText.style.textDecoration = 'line-through';
+                }
+
+                const taskButtons = document.createElement('div');
+                taskButtons.className = 'task-buttons';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.onclick = () => deleteTask(task.id);
+
+                taskButtons.appendChild(deleteBtn);
+                li.appendChild(taskText);
+                li.appendChild(taskButtons);
+                taskList.appendChild(li);
+            });
+        } catch (err) {
+            console.error('Error loading tasks:', err);
+            taskList.innerHTML = '<li>Error loading tasks</li>';
+        }
     }
 
     taskForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const taskName = taskNameInput.value.trim();
-      if (!taskName) return;
+        e.preventDefault();
 
-      try {
-        const res = await fetch('/api/tasks_handler', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskName })
-        });
+        if (!checkAuth()) return;
 
-        if (res.ok) {
-          taskNameInput.value = '';
-          await loadTasks();
-        } else {
-          alert('Failed to add task');
+        const taskName = taskNameInput.value.trim();
+        if (!taskName) return;
+
+        try {
+            const res = await fetch('/api/tasks_handler', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    taskName,
+                    username: localStorage.getItem('username') // Associate task with user
+                })
+            });
+
+            if (res.ok) {
+                taskNameInput.value = '';
+                welcomeMessage.style.display = 'none'; // Hide welcome message after adding a task
+                await loadTasks();
+            } else {
+                alert('Failed to add task');
+            }
+        } catch (err) {
+            console.error('Error adding task:', err);
+            alert('Error adding task');
         }
-      } catch (err) {
-        alert('Error adding task');
-      }
     });
 
-    // Load tasks on page load
-    loadTasks();
+    // Clear all tasks
+    clearAllBtn.addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to clear all tasks?')) return;
+
+        try {
+            // You'll need to implement this API endpoint
+            const res = await fetch('/api/tasks_handler', {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                await loadTasks();
+            } else {
+                alert('Failed to clear tasks');
+            }
+        } catch (err) {
+            console.error('Error clearing tasks:', err);
+            alert('Error clearing tasks');
+        }
+    });
+
+    // Basic delete function - you'll need to add a delete endpoint
+    async function deleteTask(taskId) {
+        try {
+            // You'll need to implement this API endpoint
+            const res = await fetch(`/api/tasks_handler?id=${taskId}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                await loadTasks();
+            } else {
+                alert('Failed to delete task');
+            }
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Error deleting task');
+        }
+    }
+
+    logoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('username');
+        window.location.href = 'index.html';
+    });
+
+    // Check for new user status from login process
+    window.onload = function() {
+        // Check URL parameters for new user flag
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('new') === 'true') {
+            localStorage.setItem('isNewUser', 'true');
+            // Remove the parameter from URL
+            window.history.replaceState({}, document.title, '/tasks.html');
+        }
+
+        // Check auth and load tasks
+        checkAuth();
+        loadTasks();
+    };
 </script>
 </body>
 </html>

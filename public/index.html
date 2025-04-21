@@ -3,14 +3,75 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login Page</title>
+  <title>Login / Register</title>
   <style>
-    /* [same styles as before] */
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background-color: #f4f4f4;
+    }
+
+    .login-container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 300px;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .note {
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 15px;
+      color: #666;
+    }
   </style>
 </head>
 <body>
 <div class="login-container">
-  <h2>Login</h2>
+  <h2>Welcome</h2>
   <form class="login-form" id="loginForm">
     <div class="form-group">
       <label for="username">Username:</label>
@@ -21,18 +82,31 @@
       <input type="password" id="password" required />
     </div>
     <div class="form-group">
-      <button type="submit">Login</button>
+      <button type="submit">Login / Register</button>
     </div>
   </form>
-  <div id="responseMessage" style="margin-top: 10px; color: red;"></div>
+  <div id="responseMessage" style="margin-top: 10px; text-align: center;"></div>
+  <p class="note">Enter your details to login or create a new account</p>
 </div>
 
 <script>
+  // Check if already logged in
+  window.onload = function() {
+    const username = localStorage.getItem('username');
+    if (username) {
+      window.location.href = 'tasks.html';
+    }
+  };
+
   document.getElementById('loginForm').addEventListener('submit', async function (e) {
     e.preventDefault();
 
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    const messageBox = document.getElementById('responseMessage');
+
+    messageBox.textContent = 'Processing...';
+    messageBox.style.color = 'blue';
 
     try {
       const response = await fetch('/api/login_user', {
@@ -42,20 +116,24 @@
       });
 
       const data = await response.json();
-      const messageBox = document.getElementById('responseMessage');
 
       if (response.ok) {
         messageBox.style.color = 'green';
-        messageBox.textContent = 'Login successful!';
+        messageBox.textContent = data.message;
+
+        // Store username in localStorage
+        localStorage.setItem('username', username);
+
         // Redirect to tasks page
-        setTimeout(() => window.location.href = 'tasks.html', 1000);
+        setTimeout(() => window.location.href = 'tasks.html', 1500);
       } else {
         messageBox.style.color = 'red';
-        messageBox.textContent = data.message || 'Login failed';
+        messageBox.textContent = data.message || 'Authentication failed';
       }
     } catch (error) {
-      console.error(error);
-      document.getElementById('responseMessage').textContent = 'Error connecting to server';
+      console.error('Login/Registration error:', error);
+      messageBox.style.color = 'red';
+      messageBox.textContent = 'Error connecting to server';
     }
   });
 </script>
