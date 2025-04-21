@@ -1,5 +1,15 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "firebase/firestore/lite";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
+  doc,
+  Timestamp
+} from "firebase/firestore/lite";
 
 // Use environment variables for Firebase config
 const firebaseConfig = {
@@ -17,27 +27,26 @@ const db = getFirestore(app);
 const tasksCollection = collection(db, "tasks");
 
 export default async function handler(req, res) {
-  // Get tasks (filtered by username if provided)
+  // ✅ GET tasks (filtered by username)
   if (req.method === 'GET') {
     try {
-      let taskQuery;
       const username = req.query.username;
-
-      if (username) {
-        // Get tasks for specific user
-        taskQuery = query(tasksCollection, where("username", "==", username));
-      } else {
-        // Get all tasks if no username specified
-        taskQuery = tasksCollection;
-      }
+      const taskQuery = username
+        ? query(tasksCollection, where("username", "==", username))
+        : tasksCollection;
 
       const snapshot = await getDocs(taskQuery);
-      const tasks = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        // Convert Firestore Timestamp to string if needed
-        timestamp: doc.data().timestamp ? doc.data().timestamp.toDate().toISOString() : null
-      }));
+
+      const tasks = snapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          ...data,
+          timestamp: data.timestamp && typeof data.timestamp.toDate === 'function'
+            ? data.timestamp.toDate().toISOString()
+            : data.timestamp || null
+        };
+      });
 
       return res.status(200).json(tasks);
     } catch (error) {
@@ -46,7 +55,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // Add a new task
+  // ✅ POST: Add new task
   if (req.method === 'POST') {
     try {
       const { taskName, username } = req.body;
@@ -57,8 +66,8 @@ export default async function handler(req, res) {
 
       const newTask = {
         taskName,
-        username: username || 'anonymous', // Store which user created the task
-        timestamp: new Date().toISOString(),
+        username: username || 'anonymous',
+        timestamp: Timestamp.now(),
         completed: false
       };
 
@@ -70,12 +79,11 @@ export default async function handler(req, res) {
     }
   }
 
-  // Delete a specific task
+  // ✅ DELETE: Delete task(s)
   if (req.method === 'DELETE') {
     try {
       const taskId = req.query.id;
 
-      // Delete all tasks for a user
       if (!taskId) {
         const username = req.query.username;
         if (!username) {
@@ -84,14 +92,12 @@ export default async function handler(req, res) {
 
         const taskQuery = query(tasksCollection, where("username", "==", username));
         const snapshot = await getDocs(taskQuery);
-
-        const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+        const deletePromises = snapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
         await Promise.all(deletePromises);
 
         return res.status(200).json({ message: 'All tasks deleted successfully' });
       }
 
-      // Delete specific task
       await deleteDoc(doc(db, "tasks", taskId));
       return res.status(200).json({ message: 'Task deleted successfully' });
     } catch (error) {
@@ -100,5 +106,6 @@ export default async function handler(req, res) {
     }
   }
 
+  // ❌ Method not allowed
   return res.status(405).json({ message: 'Method Not Allowed' });
 }
