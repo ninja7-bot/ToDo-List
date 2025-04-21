@@ -1,3 +1,7 @@
-"dependencies": {
-"firebase": "latest"
+{
+  "name": "To Do List",
+  "version": "1.0.0",
+  "dependencies": {
+    "firebase": "latest"
+  }
 }
